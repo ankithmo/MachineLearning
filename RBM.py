@@ -48,7 +48,7 @@ import tempfile
 import argparse
 import time
 import datetime
-from sklearn.datasets import fetch_mldata
+from sklearn.datasets import fetch_openml
 
 import urllib.request
 from sklearn.datasets.base import get_data_home
@@ -69,13 +69,9 @@ class BAS:
         # Create a 4x4 matrix out of the bars-and-stripes
         # collection
         #
-        values = np.zeros((self.N,1))
-        for i in range(self.N):
-            values[i] = (number >> i) % 2
-        if (orientation == 0):
-            return np.matmul(values, np.ones((1,self.N)))
-        else:
-            return np.transpose(np.matmul(values, np.ones((1,self.N))))
+        values = np.asarray([(number >> i) % 2 for i in range(self.N)]).reshape(self.N, 1)
+        result = np.matmul(values, np.ones((1,self.N)))
+        return result if orientation == 0 else np.transpose(result)
         
     def createVector(self, orientation = 0, number = 0):
         M = self.createMatrix(orientation = orientation, number = number)
@@ -91,12 +87,7 @@ class BAS:
             raise ValueError("Cannot generate that many samples")
         if 0 != (size % 2):
             raise ValueError("Number of samples must be even")
-        images = []        
-        for n in range(int(size / 2)):
-            a = self.createVector(1,n+1)
-            images.append(a)
-            b = self.createVector(0,n+1)
-            images.append(b)
+        images = [self.createVector(i,n+1) for n in range(int(size / 2)) for i in range(1,-1,-1)]
         V = np.concatenate(images, axis=1)
         return np.transpose(V)
 
@@ -117,7 +108,7 @@ class TrainingData:
             if (N != 28):
                 raise ValueError("Please use N = 28 for the MNIST data set")
             try:
-                mnist = fetch_mldata('MNIST originalss')
+                mnist = fetch_openml('mnist_784')
             except:
                 print("Could not download MNIST data from mldata.org, trying alternative...")
                 mnist_alternative_url = "https://github.com/amplab/datascience-sp14/raw/master/lab7/mldata/mnist-original.mat"
@@ -130,8 +121,8 @@ class TrainingData:
                     print("Downloading from ", mnist_alternative_url)
                     urllib.request.urlretrieve(mnist_alternative_url, mnist_save_path)
                 print("Now calling fetch_mldata once more")
-                mnist = fetch_mldata('MNIST original')
-            label = mnist['target']
+                mnist = fetch_openml('mnist_784')
+            label = np.asarray(list(map(int, mnist['target'])))
             mnist = mnist.data
             mnist = ((mnist / 255.0) + 0.5).astype(int)
             images = []
@@ -146,7 +137,7 @@ class TrainingData:
             
     def get_batch(self, batch_size = 10):
         images = []        
-        for i in range(batch_size):
+        for _ in range(batch_size):
             u = np.random.randint(low = 0, high = self.ds_size)
             images.append(self.S[u,None,:])
         return np.concatenate(images, axis=0)
